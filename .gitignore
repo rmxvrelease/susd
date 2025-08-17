@@ -4,3 +4,9 @@ dbf
 bin
 united_csv
 .venv
+results
+sia_csv
+sih_csv
+__pycache__
+sia_dbf
+sih_dbf

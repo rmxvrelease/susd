@@ -1,0 +1,42 @@
+\documentclass{report}
+\usepackage{longtable}
+\usepackage[margin=1.0cm]{geometry}
+
+\title{Laudo quantitativo}
+\author{Rafael Monteiro}
+\date{\today}
+
+
+\begin{document}
+
+\maketitle
+
+\section{Conclusões}
+Tem que ver isso aí
+
+\section{Resumo total}
+\begin{tabular}
+	\caption{Resumo do período completo}
+\end{tabular}
+
+\section{Resumo mensal}
+Explicar como a correção foi efetuada
+
+\begin{longtable}[c]{|p{1cm}|p{2.3cm}|p{2.3cm}|p{2.3cm}|c|c|}
+	\caption{Resumo mês a mês} \\ \hline
+	\textbf{Mês} &
+	\textbf{Valor devido IVR (SIA)} &
+	\textbf{Valor devido IVR (SIH)} &
+	\textbf{Valor devido IVR (SIH + SIA)} &
+	\textbf{IVR corrigido} &
+	\textbf{Indice de correção} 
+	\endhead \hline
+
+	jul-18 & 10.0 & 20.0 & 30.0 & 60.0 & 100\% \\ \hline
+	jul-18 & 10.0 & 20.0 & 30.0 & 60.0 & 100\% \\ \hline
+	jul-18 & 10.0 & 20.0 & 30.0 & 60.0 & 100\% \\ \hline
+	jul-18 & 10.0 & 20.0 & 30.0 & 60.0 & 100\% \\ \hline
+\end{longtable}
+
+	
+\end{document}
