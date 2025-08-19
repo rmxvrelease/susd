@@ -538,241 +538,208 @@ class Conversions:
         union.to_csv(path.join(ProjPaths.UNITED_CSV_DIR, f'{ProjParams.SYSTEM}.csv'), index=False)
 
 
-class IvrMonthInfo:
-    def __init__(self, sia_brt_sum: float, sih_brt_sum: float, i_rate: float, source: str, when: Date):
-        '''Parameters: brute sum, interest rate'''
-        self.i_rate = i_rate
-        self.src = source
+class MonthInfo:
+    def __init__(self, when: Date, method: str, src: str, expected: float, got: float, i_rate: float) -> None:
         self.when = when
-
-        self.brt_sum = sia_brt_sum + sih_brt_sum
-        self.adj_sum = self.brt_sum * i_rate
-        self.brt_ivr = self.brt_sum * 1.5
-        self.adj_ivr = self.brt_ivr * i_rate
-
-        self.sia_brt_sum = sia_brt_sum
-        self.sia_adj_sum = self.sia_brt_sum * i_rate
-        self.sia_brt_ivr = sia_brt_sum * 1.5
-        self.sia_adj_ivr = self.sia_brt_ivr * i_rate
-
-        self.sih_brt_sum = sih_brt_sum
-        self.sih_adj_sum = self.sih_brt_sum * i_rate
-        self.sih_brt_ivr = sih_brt_sum * 1.5
-        self.sih_adj_ivr = self.sih_brt_ivr * i_rate
+        self.expected = expected
+        self.got = got
+        self.i_rate = i_rate
+        self.method = method
+        self.src = src
 
     @classmethod
-    def from_sia(cls, sia_brt_sum: float, i_rate: float, when: Date):
-        return cls(sia_brt_sum, 0.0, i_rate, 'SIA', when)
-
-    @classmethod
-    def from_sih(cls, sih_brt_sum: float, i_rate: float, when: Date):
-        return cls(0.0, sih_brt_sum, i_rate, 'SIH', when)
-
-    @classmethod
-    def empty(cls, i_rate: float, when: Date):
-        return cls(0.0, 0.0, i_rate, 'BOTH', when)
-
-    def add_sia(self, sia_brt_sum):
-        self.sia_brt_sum = sia_brt_sum
-        self.sia_brt_ivr = sia_brt_sum * 1.5
-        self.sia_adj_sum = self.sia_brt_sum * self.i_rate
-        self.sia_adj_ivr = self.sia_brt_ivr * self.i_rate
-
-        self.brt_sum += sia_brt_sum
-        self.brt_ivr = self.brt_sum * 1.5
-        self.adj_ivr = self.brt_ivr * self.i_rate
-        self.adj_sum = self.brt_sum * self.i_rate
-
-    def add_sih(self, sih_brt_sum):
-        self.sih_brt_sum = sih_brt_sum
-        self.sih_brt_ivr = sih_brt_sum * 1.5
-        self.sih_adj_sum = self.sih_brt_sum * self.i_rate
-        self.sih_adj_ivr = self.sih_brt_ivr * self.i_rate
-
-        self.brt_sum += sih_brt_sum
-        self.brt_ivr = self.brt_sum * 1.5
-        self.adj_ivr = self.brt_ivr * self.i_rate
-        self.adj_sum = self.brt_sum * self.i_rate
+    def empty(cls, when: Date, method: str, i_rate: float):
+        return cls(when, method, 'EMPTY', 0.0, 0.0, i_rate)
 
 
-class IvrYearInfo:
+    def add_expect(self, src: str, expected: float):
+        if self.src != src:
+            if self.src == 'EMPTY':
+                self.src = src
+            self.src = 'BOTH'
+
+        self.expected += expected
+
+
+    def add_got(self, src: str, got: float):
+        if self.src != src:
+            if self.src == 'EMPTY':
+                self.src = src
+            self.src = 'BOTH'
+
+        self.got += got
+
+    def add_got_exp(self, src: str, got: float, expected: float):
+        if self.src != src:
+            if self.src == 'EMPTY':
+                self.src = src
+            self.src = 'BOTH'
+
+        self.got += got
+        self.expected += expected
+
+    def debt_then(self) -> float:
+        return (self.expected - self.got)
+
+    def debt_now(self) -> float:
+        return ((self.expected - self.got) * self.i_rate)
+
+class YearInfo:
     def __init__(self, year: int):
         self.when = year
-        self.brute_ivr_diff = 0.0
+        self.diff_then = 0.0
+        self.diff_now = 0.0
         self.val_correcao = 0.0
-        self.adj_ivr_diff = 0.0
-
-    def add_month(self, m: IvrMonthInfo):
-        self.brute_ivr_diff += m.brt_ivr/3
-        self.val_correcao += m.adj_ivr/3 - m.brt_ivr/3
-        self.adj_ivr_diff += m.adj_ivr/3
 
 
-class IvrTotalInfo:
+    def add_month(self, m: MonthInfo):
+        self.diff_then += m.debt_then()
+        self.diff_now += m.debt_now()
+        self.val_correcao += m.debt_now() - m.debt_then()
+
+
+class TotalInfo:
     def __init__(self) -> None:
-        self.brute_ivr_diff = 0.0
+        self.diff_then = 0.0
+        self.diff_now = 0.0
         self.val_correcao = 0.0
-        self.adj_ivr_diff = 0.0
 
-    def add_month(self, m: IvrMonthInfo):
-        self.brute_ivr_diff += m.brt_ivr/3
-        self.val_correcao += m.adj_ivr/3 - m.brt_ivr/3
-        self.adj_ivr_diff += m.adj_ivr/3
+    def add_month(self, m: MonthInfo):
+        self.diff_then += m.debt_then()
+        self.diff_now += m.debt_now()
+        self.val_correcao += m.debt_now() - m.debt_then()
 
 
-class ProcessingIVR:
+class Processing:
     @staticmethod
-    def adjusted_month_SIA(file_path:str) -> IvrMonthInfo:
+    def month_SIA_IVR(file_path: str) -> MonthInfo:
         df = pd.read_csv(file_path, usecols=SIA_RELEVANT_FIELDS)
         when = Date.from_sus_file_name(file_path)
         rate = InterestRate.complete_rate(when, Date(4, 2025))
         brute_sum = df["PA_VALAPR"].sum()
-
-        return IvrMonthInfo.from_sia(brute_sum, rate, when)
+        return MonthInfo(when, 'IVR', 'SIA', brute_sum*1.5, brute_sum, rate)
 
 
     @staticmethod
-    def adjusted_month_SIH(file_path: str) -> IvrMonthInfo:
+    def month_SIA_TUNEP(file_path: str) -> MonthInfo:
+        return MonthInfo(Date(1, 1), 'IVR', 'SIA', 10, 10, 10)
+
+
+    @staticmethod
+    def month_SIA_IVR_TUNEP(file_path: str) -> MonthInfo:
+        return MonthInfo(Date(1, 1), 'IVR', 'SIA', 10, 10, 10)
+
+
+    @staticmethod
+    def month_SIH_IVR(file_path: str) -> MonthInfo:
         df = pd.read_csv(file_path, usecols=SIH_RELEVANT_FIELDS)
         when = Date.from_sus_file_name(file_path)
         rate = InterestRate.complete_rate(when, Date(4, 2025))
         brute_sum = df["SP_VALATO"].sum()
-
-        return IvrMonthInfo.from_sih(brute_sum, rate, when)
-
-
-    @staticmethod
-    def brute_sum_SIA(file_path: str) -> tuple[float, Date]:
-        df = pd.read_csv(file_path, usecols=SIA_RELEVANT_FIELDS)
-        when = Date.from_sus_file_name(file_path)
-        sum = df["PA_VALAPR"].sum()
-        return sum, when
+        return MonthInfo(when, 'IVR', 'SIH', brute_sum*1.5, brute_sum, rate)
 
 
     @staticmethod
-    def brute_sum_SIH(file_path: str) -> tuple[float, Date]:
-        df = pd.read_csv(file_path, usecols=SIH_RELEVANT_FIELDS)
-        when = Date.from_sus_file_name(file_path)
-        sum = df["SP_VALATO"].sum()
-        return sum, when
+    def month_SIH_TUNEP(file_path: str) -> MonthInfo:
+        return MonthInfo(Date(1, 1), 'IVR', 'SIA', 10, 10, 10)
 
 
     @staticmethod
-    def adjusted_SIH(files: list[str]) -> list[IvrMonthInfo]:
-        res: list[IvrMonthInfo] = []
-        with Pool(processes=ProjConfigs.N_OF_THREADS) as p:
-            res = p.map(ProcessingIVR.adjusted_month_SIH, files)
-        return res
+    def month_SIH_IVR_TUNEP(file_path: str) -> MonthInfo:
+        return MonthInfo(Date(1, 1), 'IVR', 'SIA', 10, 10, 10)
 
 
     @staticmethod
-    def adjusted_SIA(files: list[str]):
-        res: list[IvrMonthInfo] = []
-        with Pool(processes=ProjConfigs.N_OF_THREADS) as p:
-            res = p.map(ProcessingIVR.adjusted_month_SIA, files)
-        return res
+    def months(sia_files: list[str], sih_files: list[str], method: str) -> list[MonthInfo]:
+        FUNCTION_TABLE = {
+            'IVR': [Processing.month_SIA_IVR, Processing.month_SIH_IVR],
+            'TUNEP': [Processing.month_SIA_TUNEP, Processing.month_SIH_TUNEP],
+            'BOTH': [Processing.month_SIA_IVR_TUNEP, Processing.month_SIH_IVR_TUNEP]
+        }
 
-    @staticmethod
-    def brute_SIA(files: list[str]):
-        res: list[tuple[float, Date]] = []
-        with Pool(processes=ProjConfigs.N_OF_THREADS) as p:
-            res = p.map(ProcessingIVR.brute_sum_SIA, files)
-        return res
+        sia_func, sih_func = FUNCTION_TABLE[method]
+        months_info: dict[str, MonthInfo] = {}
 
-    @staticmethod
-    def brute_SIH(files: list[str]):
-        res: list[tuple[float, Date]] = []
-        with Pool(processes=ProjConfigs.N_OF_THREADS) as p:
-            res = p.map(ProcessingIVR.brute_sum_SIH, files)
-        return res
+        for f_sia in sia_files:
+            m = sia_func(f_sia)
+            if not str(m.when) in months_info:
+                i_rate = InterestRate.complete_rate(m.when, ProjParams.END_INTEREST)
+                months_info[str(m.when)] = MonthInfo.empty(m.when, method, i_rate)
 
-    @staticmethod
-    def adjusted_BOTH(sia_files: list[str], sih_files: list[str]) -> list[IvrMonthInfo]:
-        brute_months_sia = ProcessingIVR.brute_SIA(sia_files)
-        brute_months_sih = ProcessingIVR.brute_SIH(sih_files)
+            months_info[str(m.when)].add_got_exp('SIA', m.got, m.expected)
 
-        months_info: dict[str,IvrMonthInfo] = {}
+        for f_sih in sih_files:
+            m = sih_func(f_sih)
+            if not str(m.when) in months_info:
+                i_rate = InterestRate.complete_rate(m.when, ProjParams.END_INTEREST)
+                months_info[str(m.when)] = MonthInfo.empty(m.when, method, i_rate)
 
-        for sia_f in brute_months_sia:
-            str_date = str(sia_f[1])
-            if not str_date in months_info:
-                i_rate = InterestRate.complete_rate(sia_f[1], ProjParams.END_INTEREST)
-                months_info[str_date] = IvrMonthInfo.empty(i_rate, sia_f[1])
+            months_info[str(m.when)].add_got_exp('SIH', m.got, m.expected)
 
-            months_info[str_date].add_sia(sia_f[0])
-
-
-        for sih_f in brute_months_sih:
-            str_date = str(sih_f[1])
-            if not str_date in months_info:
-                i_rate = InterestRate.complete_rate(sih_f[1], ProjParams.END_INTEREST)
-                months_info[str_date] = IvrMonthInfo.empty(i_rate, sih_f[1])
-
-            months_info[str_date].add_sih(sih_f[0])
-
-        lst = [i[1] for i in list(months_info.items())]
+        lst = list(months_info.values())
         lst.sort(key=lambda x: x.when)
         return lst
 
 
     @staticmethod
-    def year_results(months_res: list[IvrMonthInfo]) -> list[IvrYearInfo]:
-        years_table: dict[int, IvrYearInfo] = {}
+    def year_results(months_res: list[MonthInfo]) -> list[YearInfo]:
+        years_table: dict[int, YearInfo] = {}
 
         for month in months_res:
             year = month.when.year
             if not year in years_table:
-                years_table[year] = IvrYearInfo(year)
+                years_table[year] = YearInfo(year)
 
             years_table[year].add_month(month)
 
         lst = [i[1] for i in list(years_table.items())]
         lst.sort(key=lambda x: x.when)
         return lst
-    
+
+
     @staticmethod
-    def total_result(months_res: list[IvrMonthInfo]) -> IvrTotalInfo:
-        result = IvrTotalInfo()
+    def total_result(months_res: list[MonthInfo]) -> TotalInfo:
+        result = TotalInfo()
         for month in months_res:
             result.add_month(month)
         return result
 
 
-class IvrCsvBuilder:
+class CsvBuilder:
     @staticmethod
-    def build_month_report(months: list[IvrMonthInfo]):
+    def build_month_report(months: list[MonthInfo]):
         df = pd.DataFrame()
 
         for month in months:
             new_row = pd.DataFrame({
                 'MES': [str(month.when)],
-                'TOTAL_DEVIDO': [month.adj_ivr/3],
+                'TOTAL_DEVIDO': [month.debt_now],
                 'CORRECAO': [month.i_rate],
-                'PAGO_BRUTO_TOT': [month.brt_sum],
-                'Diferença IVR': [month.adj_ivr]})
+                'PAGO_BRUTO_TOT': [month.got],
+                'Diferença IVR': [month.debt_then]})
 
             df = pd.concat([df, new_row], ignore_index=True)
 
         df.to_csv(ProjPaths.MONTH_REPORT_PATH, index=False, sep=';', float_format="%.2f")
 
     @staticmethod
-    def build_year_report(years: list[IvrYearInfo]):
+    def build_year_report(years: list[YearInfo]):
         df = pd.DataFrame()
 
         for year in years:
             new_row = pd.DataFrame({'ANO': [str(year.when)],
-                                    'DIF_IVR_BRUTO': [str(year.brute_ivr_diff)],
+                                    'DIF_IVR_BRUTO': [str(year.diff_then)],
                                     'VAL_CORRECAO': [str(year.val_correcao)],
-                                    'DIF_IVR_CORRIGIDO': [str(year.adj_ivr_diff)]})
+                                    'DIF_IVR_CORRIGIDO': [str(year.diff_now)]})
             df = pd.concat([df, new_row], ignore_index=True)
 
         df.to_csv(ProjPaths.YEAR_REPORT_PATH, index=False, sep=';', float_format="%.2f")
 
     @staticmethod
-    def build_total_report(report: IvrTotalInfo):
-            df = pd.DataFrame({'DIF_IVR_BRUTO': [str(report.brute_ivr_diff)],
+    def build_total_report(report: TotalInfo):
+            df = pd.DataFrame({'DIF_IVR_BRUTO': [str(report.diff_then)],
                                     'VAL_CORRECAO': [str(report.val_correcao)],
-                                    'DIF_IVR_CORRIGIDO': [str(report.adj_ivr_diff)]})
+                                    'DIF_IVR_CORRIGIDO': [str(report.diff_now)]})
 
             df.to_csv(ProjPaths.TOTAL_REPORT_PATH, index=False, sep=';', float_format="%.2f")
 
@@ -780,7 +747,7 @@ class LatexBuilder:
     import template_docs.ivr_file_template
 
     @staticmethod
-    def build_IVR_latex_file(months: list[IvrMonthInfo], years: list[IvrYearInfo], report: IvrTotalInfo):
+    def build_IVR_latex_file(months: list[MonthInfo], years: list[YearInfo], report: TotalInfo):
         result = ivr_file_template.FILE_HEADER
 
         result += ivr_file_template.CONCLUSAO
@@ -788,7 +755,7 @@ class LatexBuilder:
         result += LatexBuilder.build_total_latex_table(report)
 
         result += LatexBuilder.build_year_latex_table(years)
-        
+
         result += LatexBuilder.build_month_latex_table(months)
 
         result += ivr_file_template.FILE_FOOTER
@@ -799,27 +766,27 @@ class LatexBuilder:
 
 
     @staticmethod
-    def build_month_latex_table(months: list[IvrMonthInfo]) -> str:
+    def build_month_latex_table(months: list[MonthInfo]) -> str:
         table_body = ivr_file_template.MONTH_HEADER
         for m in months:
-            table_body += f"{m.when} & {m.brt_sum:.2f} & {m.brt_ivr/3:.2f} & {(m.i_rate*100)-100:.4f}\\% & {m.adj_ivr/3:.2f}"
+            table_body += f"{m.when} & {m.got:.2f} & {m.debt_then():.2f} & {(m.i_rate*100)-100:.4f}\\% & {m.debt_now():.2f}"
             table_body += '\\\\ \\hline'
         return table_body + ivr_file_template.MONTH_FOOTER
 
 
     @staticmethod
-    def build_year_latex_table(years: list[IvrYearInfo]) -> str:
+    def build_year_latex_table(years: list[YearInfo]) -> str:
         table_body = ivr_file_template.YEAR_HEADER
         for y in years:
-            table_body += f"{y.when} & {y.brute_ivr_diff:.2f} & {y.val_correcao:.2f} & {y.adj_ivr_diff:.2f}"
+            table_body += f"{y.when} & {y.diff_then:.2f} & {y.val_correcao:.2f} & {y.diff_now:.2f}"
             table_body += '\\\\ \\hline'
         return table_body + ivr_file_template.YEAR_FOOTER
 
 
     @staticmethod
-    def build_total_latex_table(report: IvrTotalInfo) -> str:
+    def build_total_latex_table(report: TotalInfo) -> str:
         table_body = ivr_file_template.TOTAL_HEADER
-        table_body += f"{report.brute_ivr_diff:.2f} & {report.val_correcao:.2f} & {report.adj_ivr_diff:.2f}"
+        table_body += f"{report.diff_then:.2f} & {report.val_correcao:.2f} & {report.diff_now:.2f}"
         table_body += '\\\\ \\hline'
         return table_body +ivr_file_template.TOTAL_FOOTER
 
@@ -832,6 +799,13 @@ class PdfBuilder:
         shutil.move("laudo.pdf", dst)
         os.chdir(ProjPaths.SCRIPTS_DIR)
 
+
+
+class TunepProcessing:
+    '''Classe responsável pelo processamento do programa no modo em que aplica-se TUNEP sempre que existir'''
+
+class TunepIvrProcessing:
+    '''Classe responsável pelo processamento do programa no modo em que aplica-se o valor mais alto entre IVR e TUNEP para cada procedimento'''
 
 def getSIA():
     files = Downloads.find_files(
@@ -893,8 +867,8 @@ def main():
     #processamento mensal dos csvs (IVR)
     sih_files = [path.join(ProjPaths.SIH_CSVS_DIR, file) for file in os.listdir(ProjPaths.SIH_CSVS_DIR)]
     sia_files = [path.join(ProjPaths.SIA_CSVS_DIR, file) for file in os.listdir(ProjPaths.SIA_CSVS_DIR)]
-    result = ProcessingIVR.adjusted_BOTH(sia_files, sih_files)
-    IvrCsvBuilder.build_month_report(result)
+    result = Processing.months(sia_files, sih_files, 'IVR')
+    CsvBuilder.build_month_report(result)
 
 
 #main()
@@ -907,14 +881,14 @@ InterestRate.load_selic()
 sia_files = [path.join(ProjPaths.SIA_CSVS_DIR, file) for file in os.listdir(ProjPaths.SIA_CSVS_DIR)]
 sih_files = [path.join(ProjPaths.SIH_CSVS_DIR, file) for file in os.listdir(ProjPaths.SIH_CSVS_DIR)]
 
-months_results = ProcessingIVR.adjusted_BOTH(sia_files, sih_files)
-year_results = ProcessingIVR.year_results(months_results)
-total_results = ProcessingIVR.total_result(months_results)
+months_results = Processing.months(sia_files, sih_files, 'IVR')
+year_results = Processing.year_results(months_results)
+total_results = Processing.total_result(months_results)
 
-
-IvrCsvBuilder.build_month_report(months_results)
-IvrCsvBuilder.build_year_report(year_results)
-IvrCsvBuilder.build_total_report(total_results)
+print(total_results.diff_now)
+CsvBuilder.build_month_report(months_results)
+CsvBuilder.build_year_report(year_results)
+CsvBuilder.build_total_report(total_results)
 
 LatexBuilder.build_IVR_latex_file(months_results, year_results, total_results)
-PdfBuilder.write_pdf(dst=ProjPaths.RESULTS_DIR)
+PdfBuilder.write_pdf(path.join(ProjPaths.RESULTS_DIR, "laudo.pdf"))
