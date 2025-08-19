@@ -21,7 +21,7 @@ CONCLUSAO = '''
 TOTAL_HEADER = '''
 \\section{Resumo Total}
     TODO: Escrever breve descrição
-\\begin{longtable}[c]{|p{1.7cm}|p{2.6cm}|p{2.6cm}|p{2.3cm}|}
+\\begin{longtable}[c]{|p{2.4cm}|p{2.6cm}|p{2.6cm}|p{2.3cm}|}
 	\\caption{Resumo total} \\\\ \\hline
 	\\textbf{Diferença TUNEP/IVR} &
 	\\textbf{Atualização} &

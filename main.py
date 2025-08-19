@@ -2,17 +2,15 @@ from multiprocessing import Pool
 from ftplib import FTP
 import subprocess
 import os.path as path
-from numpy._core.multiarray import ITEM_HASOBJECT
+from types import ModuleType
 import pandas as pd
 import shutil
 from tables.interest_rate_before_01_2022 import INTEREST_BEFORE_01_2022
+from template_docs import ivr_file_template, tunep_file_template
 import numpy as np
 import datetime
 import os
 import sys
-
-from template_docs import ivr_file_template
-from template_docs.ivr_template import ivr_tex_str
 
 SIA_RELEVANT_FIELDS = np.array(['PA_CMP', 'PA_PROC_ID', 'PA_QTDAPR', 'PA_VALAPR'])
 SIH_RELEVANT_FIELDS = np.array(['SP_AA', 'SP_MM','SP_ATOPROF', 'SP_QTD_ATO', 'SP_VALATO'])
@@ -743,22 +741,29 @@ class CsvBuilder:
 
             df.to_csv(ProjPaths.TOTAL_REPORT_PATH, index=False, sep=';', float_format="%.2f")
 
+
 class LatexBuilder:
-    import template_docs.ivr_file_template
-
     @staticmethod
-    def build_IVR_latex_file(months: list[MonthInfo], years: list[YearInfo], report: TotalInfo):
-        result = ivr_file_template.FILE_HEADER
+    def build_IVR_latex_file(months: list[MonthInfo], years: list[YearInfo], report: TotalInfo, method: str):
+        METHOD_TEMPLATE = {
+            'IVR': ivr_file_template,
+            'TUNEP': tunep_file_template,
+            'BOTH': tunep_file_template,
+        }
 
-        result += ivr_file_template.CONCLUSAO
+        template = METHOD_TEMPLATE[method]
+        
+        result = template.FILE_HEADER
 
-        result += LatexBuilder.build_total_latex_table(report)
+        result += template.CONCLUSAO
 
-        result += LatexBuilder.build_year_latex_table(years)
+        result += LatexBuilder.build_total_latex_table(report, template)
 
-        result += LatexBuilder.build_month_latex_table(months)
+        result += LatexBuilder.build_year_latex_table(years, template)
 
-        result += ivr_file_template.FILE_FOOTER
+        result += LatexBuilder.build_month_latex_table(months, template)
+
+        result += template.FILE_FOOTER
 
         f = open(ProjPaths.LATEX_FILE_PATH, 'w')
         f.write(result)
@@ -766,29 +771,30 @@ class LatexBuilder:
 
 
     @staticmethod
-    def build_month_latex_table(months: list[MonthInfo]) -> str:
-        table_body = ivr_file_template.MONTH_HEADER
+    def build_month_latex_table(months: list[MonthInfo], template: ModuleType) -> str:
+        table_body = template.MONTH_HEADER
         for m in months:
             table_body += f"{m.when} & {m.got:.2f} & {m.debt_then():.2f} & {(m.i_rate*100)-100:.4f}\\% & {m.debt_now():.2f}"
             table_body += '\\\\ \\hline'
-        return table_body + ivr_file_template.MONTH_FOOTER
+        return table_body + template.MONTH_FOOTER
 
 
     @staticmethod
-    def build_year_latex_table(years: list[YearInfo]) -> str:
-        table_body = ivr_file_template.YEAR_HEADER
+    def build_year_latex_table(years: list[YearInfo], template: ModuleType) -> str:
+        table_body = template.YEAR_HEADER
         for y in years:
             table_body += f"{y.when} & {y.diff_then:.2f} & {y.val_correcao:.2f} & {y.diff_now:.2f}"
             table_body += '\\\\ \\hline'
-        return table_body + ivr_file_template.YEAR_FOOTER
+        return table_body + template.YEAR_FOOTER
 
 
     @staticmethod
-    def build_total_latex_table(report: TotalInfo) -> str:
-        table_body = ivr_file_template.TOTAL_HEADER
+    def build_total_latex_table(report: TotalInfo, template: ModuleType) -> str:
+        table_body = template.TOTAL_HEADER
         table_body += f"{report.diff_then:.2f} & {report.val_correcao:.2f} & {report.diff_now:.2f}"
         table_body += '\\\\ \\hline'
-        return table_body +ivr_file_template.TOTAL_FOOTER
+        return table_body + template.TOTAL_FOOTER
+
 
 class PdfBuilder:
     @staticmethod
@@ -890,5 +896,5 @@ CsvBuilder.build_month_report(months_results)
 CsvBuilder.build_year_report(year_results)
 CsvBuilder.build_total_report(total_results)
 
-LatexBuilder.build_IVR_latex_file(months_results, year_results, total_results)
+LatexBuilder.build_IVR_latex_file(months_results, year_results, total_results, 'IVR')
 PdfBuilder.write_pdf(path.join(ProjPaths.RESULTS_DIR, "laudo.pdf"))
