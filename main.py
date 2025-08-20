@@ -1,15 +1,17 @@
-from multiprocessing import Pool
-from ftplib import FTP
-import subprocess
-import os.path as path
-from typing import Callable
-import pandas as pd
-import shutil
-from tables.interest_rate_before_01_2022 import INTEREST_BEFORE_01_2022
-import numpy as np
 import datetime
 import os
+import os.path as path
+import shutil
+import subprocess
 import sys
+from ftplib import FTP
+from multiprocessing import Pool
+from typing import Callable
+
+import numpy as np
+import pandas as pd
+
+from tables.interest_rate_before_01_2022 import INTEREST_BEFORE_01_2022
 
 SIA_RELEVANT_FIELDS = np.array(['PA_CMP', 'PA_PROC_ID', 'PA_QTDAPR', 'PA_VALAPR'])
 SIH_RELEVANT_FIELDS = np.array(['SP_AA', 'SP_MM','SP_ATOPROF', 'SP_QTD_ATO', 'SP_VALATO'])
@@ -664,6 +666,35 @@ class ProcessingIVR:
         lst.sort(key=lambda x: x.when)
         return lst
 
+class Tunep:
+    TABELA_DE_CONVERSAO: pd.DataFrame
+    _TYPE_MAPPING = {'SIA': 'A', 'SIH': 'H'}
+
+    @staticmethod
+    def load_tunep(csv_path: str):
+        df = pd.read_csv(csv_path, decimal=',',  thousands='.', usecols=['CO_PROCEDIMENTO', 'ValorTUNEP', 'TP_PROCEDIMENTO'], dtype={'CO_PROCEDIMENTO': str})
+        df['ValorTUNEP'] = pd.to_numeric(df['ValorTUNEP'], errors='coerce')
+        Tunep.TABELA_DE_CONVERSAO = df.set_index('CO_PROCEDIMENTO')
+        
+    @staticmethod
+    def _get_base_value(code: str, procedure_type: str) -> float:
+        base_value = None
+                
+        row = Tunep.TABELA_DE_CONVERSAO.loc[code]
+        expected_type = Tunep._TYPE_MAPPING.get(procedure_type.upper())
+        if row['TP_PROCEDIMENTO'] == expected_type:
+            found_value = row['ValorTUNEP']
+            if not pd.isna(found_value):
+                base_value = float(found_value)
+        return base_value
+
+    @staticmethod
+    def getValTunep(code: str, procedure_type: str, quantity: int, procedure_value: float) -> float:
+        base_tunep_value = Tunep._get_base_value(code, procedure_type)
+        if base_tunep_value is not None:
+            final_value = (quantity * base_tunep_value) - procedure_value
+            return final_value
+        return None
 
 class SavingIVR:
     @staticmethod
@@ -682,8 +713,6 @@ class SavingIVR:
             df = pd.concat([df, new_row], ignore_index=True)
 
         df.to_csv(ProjPaths.MONTH_REPORT_PATH, index=False)
-
-
 
 def getSIA():
     files = Downloads.find_files(
@@ -752,7 +781,7 @@ def main():
         
 
 
-#main()
+main()
 
 ProjParams.init()
 ProjPaths.define_paths()
