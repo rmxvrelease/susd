@@ -9,8 +9,8 @@ from tables.interest_rate_before_01_2022 import INTEREST_BEFORE_01_2022
 from template_docs import ivr_file_template, tunep_file_template
 import numpy as np
 import datetime
-import os
 import sys
+import os
 
 SIA_RELEVANT_FIELDS = np.array(['PA_CMP', 'PA_PROC_ID', 'PA_QTDAPR', 'PA_VALAPR'])
 SIH_RELEVANT_FIELDS = np.array(['SP_AA', 'SP_MM','SP_ATOPROF', 'SP_QTD_ATO', 'SP_VALATO'])
@@ -703,6 +703,37 @@ class Processing:
         return result
 
 
+class Tunep:
+    TABELA_DE_CONVERSAO: pd.DataFrame
+    _TYPE_MAPPING = {'SIA': 'A', 'SIH': 'H'}
+
+    @staticmethod
+    def load_tunep(csv_path: str):
+        df = pd.read_csv(csv_path, decimal=',',  thousands='.', usecols=np.array(['CO_PROCEDIMENTO', 'ValorTUNEP', 'TP_PROCEDIMENTO']), dtype={'CO_PROCEDIMENTO': str})
+        df['ValorTUNEP'] = pd.to_numeric(df['ValorTUNEP'], errors='coerce')
+        Tunep.TABELA_DE_CONVERSAO = df.set_index('CO_PROCEDIMENTO')
+        
+    @staticmethod
+    def _get_base_value(code: str, procedure_type: str) -> float|None:
+        base_value = None
+                
+        row = Tunep.TABELA_DE_CONVERSAO.loc[code]
+        expected_type = Tunep._TYPE_MAPPING.get(procedure_type.upper())
+        if row['TP_PROCEDIMENTO'] == expected_type:
+            found_value = row['ValorTUNEP']
+            if not pd.isna(found_value):
+                base_value = float(found_value)
+        return base_value
+
+    @staticmethod
+    def getValTunep(code: str, procedure_type: str, quantity: int, procedure_value: float) -> float|None:
+        base_tunep_value = Tunep._get_base_value(code, procedure_type)
+        if base_tunep_value is not None:
+            final_value = (quantity * base_tunep_value) - procedure_value
+            return final_value
+        return None
+
+
 class CsvBuilder:
     @staticmethod
     def build_month_report(months: list[MonthInfo]):
@@ -813,6 +844,7 @@ class TunepProcessing:
 class TunepIvrProcessing:
     '''Classe responsável pelo processamento do programa no modo em que aplica-se o valor mais alto entre IVR e TUNEP para cada procedimento'''
 
+
 def getSIA():
     files = Downloads.find_files(
         "SIA",
@@ -876,8 +908,6 @@ def main():
     result = Processing.months(sia_files, sih_files, 'IVR')
     CsvBuilder.build_month_report(result)
 
-
-#main()
 
 ProjParams.init()
 ProjPaths.define_paths()
