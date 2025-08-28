@@ -1,4 +1,4 @@
-This is XeTeX, Version 3.141592653-2.6-0.999996 (TeX Live 2025/dev/Debian) (preloaded format=xelatex 2025.8.1)  19 AUG 2025 18:30
+This is XeTeX, Version 3.141592653-2.6-0.999996 (TeX Live 2025/dev/Debian) (preloaded format=xelatex 2025.8.1)  26 AUG 2025 20:39
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -76,7 +76,7 @@ File: l3backend-xetex.def 2024-05-08 L3 backend support: XeTeX
 \g__pdf_backend_annotation_int=\count276
 \g__pdf_backend_link_int=\count277
 )
-(./laudo.aux)
+No file laudo.aux.
 \openout1 = `laudo.aux'.
 
 LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 11.
@@ -95,7 +95,6 @@ LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 11.
 LaTeX Font Info:    ... okay on input line 11.
 LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 11.
 LaTeX Font Info:    ... okay on input line 11.
-
 *geometry* driver: auto-detecting
 *geometry* detected driver: xetex
 *geometry* verbose mode - [ preamble ] result:
@@ -141,21 +140,36 @@ LaTeX Font Info:    External font `cmex10' loaded for size
 [1
 
 ]
-Underfull \hbox (badness 10000) in paragraph at lines 22--22
+LaTeX Font Info:    External font `cmex10' loaded for size
+(Font)              <7> on input line 40.
+LaTeX Font Info:    External font `cmex10' loaded for size
+(Font)              <5> on input line 40.
+
+Underfull \hbox (badness 10000) in paragraph at lines 48--48
 []|\TU/lmr/bx/n/10 Diferença
  []
 
 
-Overfull \hbox (4.41042pt too wide) in paragraph at lines 26--26
-[]|\TU/lmr/m/n/10 24492959.59| 
+Overfull \hbox (9.41042pt too wide) in paragraph at lines 52--52
+[]|\TU/lmr/m/n/10 251032742.41| 
  []
 
-
-Underfull \hbox (badness 2181) in paragraph at lines 47--47
+[1]
+Underfull \hbox (badness 2181) in paragraph at lines 70--70
 []|\TU/lmr/bx/n/10 Valor original
  []
 
-[1] [2]
+
+Underfull \hbox (badness 10000) in paragraph at lines 72--72
+[]|\TU/lmr/bx/n/10 Atualização
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 72--72
+\TU/lmr/bx/n/10 antes de
+ []
+
+[2]
 
 [3] (./laudo.aux)
  ***********
@@ -164,12 +178,12 @@ L3 programming layer <2025-01-18>
  ***********
  ) 
 Here is how much of TeX's memory you used:
- 1216 strings out of 473835
- 20398 string characters out of 5731947
- 554215 words of memory out of 5000000
- 24326 multiletter control sequences out of 15000+600000
- 561621 words of font info for 51 fonts, out of 8000000 for 9000
+ 1222 strings out of 473835
+ 20574 string characters out of 5731947
+ 513989 words of memory out of 5000000
+ 24331 multiletter control sequences out of 15000+600000
+ 561637 words of font info for 53 fonts, out of 8000000 for 9000
  1348 hyphenation exceptions out of 8191
- 57i,6n,65p,6203b,243s stack positions out of 10000i,1000n,20000p,200000b,200000s
+ 57i,6n,65p,4875b,244s stack positions out of 10000i,1000n,20000p,200000b,200000s
 
 Output written on laudo.pdf (4 pages).

@@ -35,6 +35,8 @@ class ProjPaths:
     YEAR_REPORT_PATH: str = ""
     LATEX_DIR: str = ""
     LATEX_FILE_PATH: str = ""
+    SIA_TUNEP_TABLE_PATH: str = ""
+    SIH_TUNEP_TABLE_PATH: str = ""
 
     @staticmethod
     def init():
@@ -62,6 +64,8 @@ class ProjPaths:
         ProjPaths.TOTAL_REPORT_PATH = path.join(ProjPaths.RESULTS_DIR, "total.csv")
         ProjPaths.LATEX_DIR = path.join(ProjPaths.SCRIPTS_DIR, "latex")
         ProjPaths.LATEX_FILE_PATH = path.join(ProjPaths.LATEX_DIR, "laudo.tex")
+        ProjPaths.SIA_TUNEP_TABLE_PATH = path.join(ProjPaths.TABLES_DIR, "tabela_tunep_sia.csv")
+        ProjPaths.SIH_TUNEP_TABLE_PATH = path.join(ProjPaths.TABLES_DIR, "tabela_tunep_sih.csv")
 
     @staticmethod
     def create_paths():
@@ -250,7 +254,7 @@ class ProjPaths:
 
 
 class ProjConfigs:
-    N_OF_THREADS = 1
+    N_OF_THREADS = 8
 
 
 class Date:
@@ -307,18 +311,31 @@ class ProjParams:
     CNES: str = "0000000"
     STATE: str = "AC"
     SYSTEM:str = "SIA"
+    METHOD: str = "IVR"
     START: Date = Date(1, 2023)
     END: Date = Date(12, 2023)
     END_INTEREST: Date = Date(4, 2025)
+    DATA_CIACAO: Date = Date(4, 2025)
+    CIDADE: str = "CITY"
+    RAZAO_SOCIAL: str = "Razão Social"
+    NOME_FANTASIA: str = "Nome Fantasia"
+    NUMERO_PROCESSO: str = "Número Processo"
 
     @staticmethod
     def init():
         ProjParams.CNES = sys.argv[1]
         ProjParams.STATE = sys.argv[2]
         ProjParams.SYSTEM = sys.argv[3]
-        ProjParams.START = Date.from_string(sys.argv[4])
-        ProjParams.END = Date.from_string(sys.argv[5])
-        ProjParams.END_INTEREST = Date.from_string(sys.argv[6])
+        ProjParams.METHOD = sys.argv[4]
+        ProjParams.START = Date.from_string(sys.argv[5])
+        ProjParams.END = Date.from_string(sys.argv[6])
+        ProjParams.END_INTEREST = Date.from_string(sys.argv[7])
+        ProjParams.DATA_CIACAO = Date.from_string(sys.argv[8])
+        ProjParams.CIDADE = sys.argv[9]
+        ProjParams.RAZAO_SOCIAL = sys.argv[10]
+        ProjParams.NOME_FANTASIA = sys.argv[11]
+        ProjParams.NUMERO_PROCESSO = sys.argv[12]
+
 
     @staticmethod
     def get_start_date():
@@ -349,7 +366,6 @@ class InterestRate:
     @staticmethod
     def load_selic():
         end_time_str = Date.first_day_of_previous_month()
-        print(end_time_str)
         try: selic = pd.read_csv(f"https://api.bcb.gov.br/dados/serie/bcdata.sgs.4390/dados?formato=csv&dataInicial=01/12/2021&dataFinal={end_time_str}", sep=";")
         except: selic = pd.read_csv(ProjPaths.SELIC_TABLE_PATH)
 
@@ -388,6 +404,14 @@ class InterestRate:
         rate_after_01_2022 = InterestRate.cumulative_selic(s, e)
         return rate_before_01_2022 * (1.0 + rate_after_01_2022)
 
+    @staticmethod
+    def complete_rate_split(s: Date, e: Date) -> tuple[float, float, float]:
+        rate_before_01_2022 = InterestRate.rate_until_01_2022(s)
+        rate_after_01_2022 = InterestRate.cumulative_selic(s, e)
+        return (rate_before_01_2022,
+                1.0+rate_after_01_2022,
+                rate_before_01_2022 * (1.0 + rate_after_01_2022))
+
 
 
 class Downloads:
@@ -411,7 +435,38 @@ class Downloads:
     @staticmethod
     def download(files: list[str]):
         with Pool(processes=ProjConfigs.N_OF_THREADS) as p:
-            p.map(Downloads.download_file, files)
+            file_sets: list[list[str]] = [[]]
+            f_index = 0
+            while (f_index < len(files)):
+                if (len(file_sets[-1]) < 6):
+                    file_sets[-1].append(files[f_index])
+                    f_index+=1
+                else:
+                    file_sets.append([files[f_index]])
+                    f_index+=1
+
+            p.map(Downloads.download_many, file_sets)
+
+    @staticmethod
+    def download_many(files: list[str]):
+        ftp = FTP("ftp.datasus.gov.br")
+        ftp.login()
+        dowload_dir_path = ProjPaths.DOWNLOAD_DIR
+        for file in files:
+            file_name = path.split(file)[-1]
+            local_file_path = path.join(dowload_dir_path, file_name)
+
+            try:
+                with open(local_file_path, 'wb') as f:
+                    ftp.retrbinary(f"RETR {file}", f.write)
+            except:
+                ftp = FTP("ftp.datasus.gov.br")
+                ftp.login()
+                with open(local_file_path, 'wb') as f:
+                    ftp.retrbinary(f"RETR {file}", f.write)
+
+            print(f"Downloaded {file_name}")
+        ftp.quit()
 
     @staticmethod
     def find_files(sistema: str, estado: str, inicio: Date, fim: Date):
@@ -536,18 +591,55 @@ class Conversions:
         union.to_csv(path.join(ProjPaths.UNITED_CSV_DIR, f'{ProjParams.SYSTEM}.csv'), index=False)
 
 
+class Tunep:
+    TABELA_DE_CONVERSAO_SIA: pd.DataFrame
+    TABELA_DE_CONVERSAO_SIH: pd.DataFrame
+
+    _TYPE_MAPPING = {'SIA': 'A', 'SIH': 'H'}
+
+
+    @staticmethod
+    def load_tunep():
+        sia_df = pd.read_csv(ProjPaths.SIA_TUNEP_TABLE_PATH, decimal=',',  thousands='.', usecols=np.array(['CO_PROCEDIMENTO', 'ValorTUNEP', 'TP_PROCEDIMENTO']), dtype={'CO_PROCEDIMENTO': str})
+        sia_df['ValorTUNEP'] = pd.to_numeric(sia_df['ValorTUNEP'], errors='coerce')
+        Tunep.TABELA_DE_CONVERSAO_SIA = sia_df.set_index('CO_PROCEDIMENTO')
+
+        sih_df = pd.read_csv(ProjPaths.SIH_TUNEP_TABLE_PATH, decimal=',',  thousands='.', usecols=np.array(['CO_PROCEDIMENTO', 'ValorTUNEP', 'TP_PROCEDIMENTO']), dtype={'CO_PROCEDIMENTO': str})
+        sih_df['ValorTUNEP'] = pd.to_numeric(sih_df['ValorTUNEP'], errors='coerce')
+        Tunep.TABELA_DE_CONVERSAO_SIH = sih_df.set_index('CO_PROCEDIMENTO')
+
+
+    @staticmethod
+    def _get_base_value(code: str, procedure_type: str) -> float|None:
+        TABLE_MAPPING = {'SIA': Tunep.TABELA_DE_CONVERSAO_SIA, 'SIH': Tunep.TABELA_DE_CONVERSAO_SIH}
+        try: row = TABLE_MAPPING[procedure_type].loc[code]
+        except: return None
+        found_value = row['ValorTUNEP']
+        return float(found_value)
+
+
+    @staticmethod
+    def getValTunep(code: str, procedure_type: str, quantity: int, procedure_value: float) -> float|None:
+        base_tunep_value = Tunep._get_base_value(code, procedure_type)
+        if base_tunep_value is not None:
+            final_value = (quantity * base_tunep_value) - procedure_value
+            return final_value
+        return None
+
+
 class MonthInfo:
-    def __init__(self, when: Date, method: str, src: str, expected: float, got: float, i_rate: float) -> None:
+    def __init__(self, when: Date, method: str, src: str, expected: float, got: float, rates: tuple[float, float, float]) -> None:
+        '''Importante: Os rates são divididos em nos seguintes 3 valores: taxa antes de 01-2022, taxa a partir de 01-2022 e compsição das duas taxas.'''
         self.when = when
         self.expected = expected
         self.got = got
-        self.i_rate = i_rate
+        self.rates = rates
         self.method = method
         self.src = src
 
     @classmethod
-    def empty(cls, when: Date, method: str, i_rate: float):
-        return cls(when, method, 'EMPTY', 0.0, 0.0, i_rate)
+    def empty(cls, when: Date, method: str, rates: tuple[float, float, float]):
+        return cls(when, method, 'EMPTY', 0.0, 0.0, rates)
 
 
     def add_expect(self, src: str, expected: float):
@@ -580,7 +672,7 @@ class MonthInfo:
         return (self.expected - self.got)
 
     def debt_now(self) -> float:
-        return ((self.expected - self.got) * self.i_rate)
+        return ((self.expected - self.got) * self.rates[2])
 
 class YearInfo:
     def __init__(self, year: int):
@@ -613,38 +705,90 @@ class Processing:
     def month_SIA_IVR(file_path: str) -> MonthInfo:
         df = pd.read_csv(file_path, usecols=SIA_RELEVANT_FIELDS)
         when = Date.from_sus_file_name(file_path)
-        rate = InterestRate.complete_rate(when, Date(4, 2025))
+        rate = InterestRate.complete_rate_split(when, ProjParams.END_INTEREST)
         brute_sum = df["PA_VALAPR"].sum()
         return MonthInfo(when, 'IVR', 'SIA', brute_sum*1.5, brute_sum, rate)
+
+    @staticmethod
+    def row_SIA_TUNEP(row: pd.Series):
+        got = float(row['PA_VALAPR'])
+        tunep_unit_val = Tunep._get_base_value(str(row['PA_PROC_ID']), 'SIA')
+        return (tunep_unit_val * int(row['PA_QTDAPR']) if tunep_unit_val != None else got * 1.5)
 
 
     @staticmethod
     def month_SIA_TUNEP(file_path: str) -> MonthInfo:
-        return MonthInfo(Date(1, 1), 'IVR', 'SIA', 10, 10, 10)
+        df = pd.read_csv(file_path, usecols=SIA_RELEVANT_FIELDS, dtype={'PA_PROC_ID': 'str', 'PA_QTDAPR': 'int'})
+        when = Date.from_sus_file_name(file_path)
+        rate = InterestRate.complete_rate_split(when, ProjParams.END_INTEREST)
+
+        res = float(df.apply(Processing.row_SIA_TUNEP, axis=1, result_type='reduce').sum())
+        got = float(df["PA_VALAPR"].sum())
+        return MonthInfo(when, 'TUNEP', 'SIA', res, got, rate)
+
+
+    @staticmethod
+    def row_SIA_IVR_TUNEP(row: pd.Series):
+        got = float(row['PA_VALAPR'])
+        tunep_unit_val = Tunep._get_base_value(str(row['PA_PROC_ID']), 'SIA')
+        tunep_unit_val = (tunep_unit_val if tunep_unit_val != None else 0.0)
+        return max(tunep_unit_val * int(row['PA_QTDAPR']), got*1.5)
+
+
+    @staticmethod
+    def row_SIH_IVR_TUNEP(row: pd.Series):
+        got = float(row['SP_VALATO'])
+        tunep_unit_val = Tunep._get_base_value(str(row['SP_ATOPROF'])[1:], 'SIH')
+        tunep_unit_val = (tunep_unit_val if tunep_unit_val != None else 0.0)
+        return max(tunep_unit_val*int(row['SP_QTD_ATO']), got*1.5)
+
 
 
     @staticmethod
     def month_SIA_IVR_TUNEP(file_path: str) -> MonthInfo:
-        return MonthInfo(Date(1, 1), 'IVR', 'SIA', 10, 10, 10)
+        df = pd.read_csv(file_path, usecols=SIA_RELEVANT_FIELDS, dtype={'PA_PROC_ID': 'str', 'PA_QTDAPR': 'int'})
+        when = Date.from_sus_file_name(file_path)
+        rate = InterestRate.complete_rate_split(when, ProjParams.END_INTEREST)
+        res = float(df.apply(Processing.row_SIA_IVR_TUNEP, axis=1, result_type='reduce').sum())
+        got = float(df["PA_VALAPR"].sum())
+        return MonthInfo(when, 'BOTH', 'SIA', res, got, rate)
+
+
+
+    @staticmethod
+    def row_SIH_TUNEP(row: pd.Series):
+        got = np.float64(row['SP_VALATO'])
+        tunep_unit_val = Tunep._get_base_value(str(row['SP_ATOPROF'])[1:], 'SIH')
+        return (tunep_unit_val * int(row['SP_QTD_ATO']) if tunep_unit_val != None else got * 1.5)
 
 
     @staticmethod
     def month_SIH_IVR(file_path: str) -> MonthInfo:
         df = pd.read_csv(file_path, usecols=SIH_RELEVANT_FIELDS)
         when = Date.from_sus_file_name(file_path)
-        rate = InterestRate.complete_rate(when, Date(4, 2025))
+        rate = InterestRate.complete_rate_split(when, ProjParams.END_INTEREST)
         brute_sum = df["SP_VALATO"].sum()
         return MonthInfo(when, 'IVR', 'SIH', brute_sum*1.5, brute_sum, rate)
 
 
     @staticmethod
     def month_SIH_TUNEP(file_path: str) -> MonthInfo:
-        return MonthInfo(Date(1, 1), 'IVR', 'SIA', 10, 10, 10)
+        df = pd.read_csv(file_path, usecols=SIH_RELEVANT_FIELDS, dtype={'SP_ATOPROF': 'str', 'SP_QTD_ATO': 'int'})
+        when = Date.from_sus_file_name(file_path)
+        rate = InterestRate.complete_rate_split(when, ProjParams.END_INTEREST)
+        res = df.apply(Processing.row_SIH_TUNEP, axis=1).sum()
+        got = df["SP_VALATO"].sum()
+        return MonthInfo(when, 'TUNEP', 'SIH', res, got, rate)
 
 
     @staticmethod
     def month_SIH_IVR_TUNEP(file_path: str) -> MonthInfo:
-        return MonthInfo(Date(1, 1), 'IVR', 'SIA', 10, 10, 10)
+        df = pd.read_csv(file_path, usecols=SIH_RELEVANT_FIELDS, dtype={'SP_ATOPROF': 'str', 'SP_QTD_ATO': 'int'})
+        when = Date.from_sus_file_name(file_path)
+        rate = InterestRate.complete_rate_split(when, ProjParams.END_INTEREST)
+        res = df.apply(Processing.row_SIH_IVR_TUNEP, axis=1, result_type='reduce').sum()
+        got = df["SP_VALATO"].sum()
+        return MonthInfo(when, 'BOTH', 'SIH', float(res), float(got), rate)
 
 
     @staticmethod
@@ -661,17 +805,15 @@ class Processing:
         for f_sia in sia_files:
             m = sia_func(f_sia)
             if not str(m.when) in months_info:
-                i_rate = InterestRate.complete_rate(m.when, ProjParams.END_INTEREST)
-                months_info[str(m.when)] = MonthInfo.empty(m.when, method, i_rate)
-
+                rate = InterestRate.complete_rate_split(m.when, ProjParams.END_INTEREST)
+                months_info[str(m.when)] = MonthInfo.empty(m.when, method, rate)
             months_info[str(m.when)].add_got_exp('SIA', m.got, m.expected)
 
         for f_sih in sih_files:
             m = sih_func(f_sih)
             if not str(m.when) in months_info:
-                i_rate = InterestRate.complete_rate(m.when, ProjParams.END_INTEREST)
-                months_info[str(m.when)] = MonthInfo.empty(m.when, method, i_rate)
-
+                rate = InterestRate.complete_rate_split(m.when, ProjParams.END_INTEREST)
+                months_info[str(m.when)] = MonthInfo.empty(m.when, method, rate)
             months_info[str(m.when)].add_got_exp('SIH', m.got, m.expected)
 
         lst = list(months_info.values())
@@ -703,37 +845,6 @@ class Processing:
         return result
 
 
-class Tunep:
-    TABELA_DE_CONVERSAO: pd.DataFrame
-    _TYPE_MAPPING = {'SIA': 'A', 'SIH': 'H'}
-
-    @staticmethod
-    def load_tunep(csv_path: str):
-        df = pd.read_csv(csv_path, decimal=',',  thousands='.', usecols=np.array(['CO_PROCEDIMENTO', 'ValorTUNEP', 'TP_PROCEDIMENTO']), dtype={'CO_PROCEDIMENTO': str})
-        df['ValorTUNEP'] = pd.to_numeric(df['ValorTUNEP'], errors='coerce')
-        Tunep.TABELA_DE_CONVERSAO = df.set_index('CO_PROCEDIMENTO')
-        
-    @staticmethod
-    def _get_base_value(code: str, procedure_type: str) -> float|None:
-        base_value = None
-                
-        row = Tunep.TABELA_DE_CONVERSAO.loc[code]
-        expected_type = Tunep._TYPE_MAPPING.get(procedure_type.upper())
-        if row['TP_PROCEDIMENTO'] == expected_type:
-            found_value = row['ValorTUNEP']
-            if not pd.isna(found_value):
-                base_value = float(found_value)
-        return base_value
-
-    @staticmethod
-    def getValTunep(code: str, procedure_type: str, quantity: int, procedure_value: float) -> float|None:
-        base_tunep_value = Tunep._get_base_value(code, procedure_type)
-        if base_tunep_value is not None:
-            final_value = (quantity * base_tunep_value) - procedure_value
-            return final_value
-        return None
-
-
 class CsvBuilder:
     @staticmethod
     def build_month_report(months: list[MonthInfo]):
@@ -743,7 +854,7 @@ class CsvBuilder:
             new_row = pd.DataFrame({
                 'MES': [str(month.when)],
                 'TOTAL_DEVIDO': [month.debt_now],
-                'CORRECAO': [month.i_rate],
+                'CORRECAO': [month.rates],
                 'PAGO_BRUTO_TOT': [month.got],
                 'Diferença IVR': [month.debt_then]})
 
@@ -775,7 +886,7 @@ class CsvBuilder:
 
 class LatexBuilder:
     @staticmethod
-    def build_IVR_latex_file(months: list[MonthInfo], years: list[YearInfo], report: TotalInfo, method: str):
+    def build_latex_file(months: list[MonthInfo], years: list[YearInfo], report: TotalInfo, method: str):
         METHOD_TEMPLATE = {
             'IVR': ivr_file_template,
             'TUNEP': tunep_file_template,
@@ -783,10 +894,22 @@ class LatexBuilder:
         }
 
         template = METHOD_TEMPLATE[method]
-        
+
         result = template.FILE_HEADER
 
-        result += template.CONCLUSAO
+        result += template.DESCRICAO.format(cnes=ProjParams.CNES,
+                                            cidade=ProjParams.CIDADE,
+                                            estado=ProjParams.STATE,
+                                            numero_processo=ProjParams.NUMERO_PROCESSO,
+                                            razao_social=ProjParams.RAZAO_SOCIAL,
+                                            nome_fantasia=ProjParams.NOME_FANTASIA)
+        
+        result += template.METODOLOGIA
+
+        result += template.CONCLUSAO.format(valor_total=str(report.diff_now))
+
+        
+        result += template.CONCLUSAO.format(valor_total=str(report.diff_now))
 
         result += LatexBuilder.build_total_latex_table(report, template)
 
@@ -800,12 +923,12 @@ class LatexBuilder:
         f.write(result)
         f.close()
 
-
+        
     @staticmethod
     def build_month_latex_table(months: list[MonthInfo], template: ModuleType) -> str:
         table_body = template.MONTH_HEADER
         for m in months:
-            table_body += f"{m.when} & {m.got:.2f} & {m.debt_then():.2f} & {(m.i_rate*100)-100:.4f}\\% & {m.debt_now():.2f}"
+            table_body += f"{m.when} & {m.got:.2f} & {m.debt_then():.2f} & {(m.rates[0]*100)-100:.4f}\\% & {(m.rates[1]*100)-100:.4f}\\% & {m.debt_now():.2f}"
             table_body += '\\\\ \\hline'
         return table_body + template.MONTH_FOOTER
 
@@ -837,17 +960,9 @@ class PdfBuilder:
         os.chdir(ProjPaths.SCRIPTS_DIR)
 
 
-
-class TunepProcessing:
-    '''Classe responsável pelo processamento do programa no modo em que aplica-se TUNEP sempre que existir'''
-
-class TunepIvrProcessing:
-    '''Classe responsável pelo processamento do programa no modo em que aplica-se o valor mais alto entre IVR e TUNEP para cada procedimento'''
-
-
-def getSIA():
+def get_files(system: str):
     files = Downloads.find_files(
-        "SIA",
+        system,
         ProjParams.get_state(),
         ProjParams.get_start_date(),
         ProjParams.get_end_date())
@@ -862,28 +977,7 @@ def getSIA():
     Conversions.convert_files()
     print("conversions finished")
 
-    Conversions.unite_files("SIA")
-    print("files united")
-
-
-def getSIH():
-    files = Downloads.find_files(
-        "SIH",
-        ProjParams.get_state(),
-        ProjParams.get_start_date(),
-        ProjParams.get_end_date())
-
-    print("will download the follwing files:")
-    for file in files:
-        print(file)
-
-    Downloads.download(files)
-    print("downloads finished")
-
-    Conversions.convert_files()
-    print("conversions finished")
-
-    Conversions.unite_files("SIH")
+    Conversions.unite_files(system)
     print("files united")
 
 
@@ -891,40 +985,28 @@ def main():
     ProjPaths.init()
     ProjParams.init()
     InterestRate.load_selic()
+    Tunep.load_tunep()
 
     # download e conversão para csv
-    if ProjParams.SYSTEM == "SIA":
-        getSIA()
-    elif ProjParams.SYSTEM == "SIH":
-        getSIH()
+    if ProjParams.SYSTEM == "SIA" or ProjParams.SYSTEM == "SIH":
+        get_files(ProjParams.SYSTEM)
     elif ProjParams.SYSTEM == "BOTH":
-        getSIA()
+        get_files("SIA")
         ProjPaths.empty_download_dir()
-        getSIH()
+        get_files("SIH")
+    else:
+        print(f'Sistema do sus não reconhecido {ProjParams.SYSTEM}')
+        exit(1)
 
-    #processamento mensal dos csvs (IVR)
+    # arquivos a serem processados
     sih_files = [path.join(ProjPaths.SIH_CSVS_DIR, file) for file in os.listdir(ProjPaths.SIH_CSVS_DIR)]
     sia_files = [path.join(ProjPaths.SIA_CSVS_DIR, file) for file in os.listdir(ProjPaths.SIA_CSVS_DIR)]
-    result = Processing.months(sia_files, sih_files, 'IVR')
-    CsvBuilder.build_month_report(result)
 
+    # processamento dos dadaos
+    months = Processing.months(sia_files, sih_files, ProjParams.METHOD)
+    years = Processing.year_results(months)
+    total = Processing.total_result(months)
 
-ProjParams.init()
-ProjPaths.define_paths()
-ProjPaths.create_latex_dir()
-InterestRate.load_selic()
-
-sia_files = [path.join(ProjPaths.SIA_CSVS_DIR, file) for file in os.listdir(ProjPaths.SIA_CSVS_DIR)]
-sih_files = [path.join(ProjPaths.SIH_CSVS_DIR, file) for file in os.listdir(ProjPaths.SIH_CSVS_DIR)]
-
-months_results = Processing.months(sia_files, sih_files, 'IVR')
-year_results = Processing.year_results(months_results)
-total_results = Processing.total_result(months_results)
-
-print(total_results.diff_now)
-CsvBuilder.build_month_report(months_results)
-CsvBuilder.build_year_report(year_results)
-CsvBuilder.build_total_report(total_results)
-
-LatexBuilder.build_IVR_latex_file(months_results, year_results, total_results, 'IVR')
-PdfBuilder.write_pdf(path.join(ProjPaths.RESULTS_DIR, "laudo.pdf"))
+    # geração dos documentos pertinentes aos dados
+    LatexBuilder.build_latex_file(months, years, total, ProjParams.METHOD)    
+    PdfBuilder.write_pdf(path.join(ProjPaths.RESULTS_DIR, 'laudo.pdf'))
