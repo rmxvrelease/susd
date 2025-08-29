@@ -323,6 +323,15 @@ class ProjParams:
 
     @staticmethod
     def init():
+        if sys.argv[1] == 'raw':
+            ProjParams.METHOD = 'RAW'
+            ProjParams.CNES = sys.argv[2]
+            ProjParams.STATE = sys.argv[3]
+            ProjParams.SYSTEM = sys.argv[4]
+            ProjParams.START = Date.from_string(sys.argv[5])
+            ProjParams.END = Date.from_string(sys.argv[6])
+            return
+
         ProjParams.CNES = sys.argv[1]
         ProjParams.STATE = sys.argv[2]
         ProjParams.SYSTEM = sys.argv[3]
@@ -997,6 +1006,9 @@ def main():
     else:
         print(f'Sistema do sus não reconhecido {ProjParams.SYSTEM}')
         exit(1)
+
+    if ProjParams.METHOD == 'RAW':
+        return
 
     # arquivos a serem processados
     sih_files = [path.join(ProjPaths.SIH_CSVS_DIR, file) for file in os.listdir(ProjPaths.SIH_CSVS_DIR)]
