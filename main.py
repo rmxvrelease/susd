@@ -17,7 +17,8 @@ SIH_RELEVANT_FIELDS = np.array(['SP_AA', 'SP_MM','SP_ATOPROF', 'SP_QTD_ATO', 'SP
 
 # Class responsible for defining, sharing and creating the directories used in the program
 class ProjPaths:
-    DOWNLOAD_DIR: str = ""
+    SIA_DOWNLOAD_DIR: str = ""
+    SIH_DOWNLOAD_DIR: str = ""
     BINARIES_DIR: str = ""
     SCRIPTS_DIR: str = ""
     SIA_DBFS_DIR: str = ""
@@ -47,7 +48,8 @@ class ProjPaths:
     @staticmethod
     def define_paths():
         ProjPaths.SCRIPTS_DIR = path.split(path.join(os.getcwd(), sys.argv[0]))[0]
-        ProjPaths.DOWNLOAD_DIR = path.join(ProjPaths.SCRIPTS_DIR, "download")
+        ProjPaths.SIA_DOWNLOAD_DIR = path.join(ProjPaths.SCRIPTS_DIR, "sia_download")
+        ProjPaths.SIH_DOWNLOAD_DIR = path.join(ProjPaths.SCRIPTS_DIR, "sih_download")
         ProjPaths.BINARIES_DIR = path.join(ProjPaths.SCRIPTS_DIR, "bin")
         ProjPaths.SIA_DBFS_DIR = path.join(ProjPaths.SCRIPTS_DIR, "sia_dbf")
         ProjPaths.SIH_DBFS_DIR = path.join(ProjPaths.SCRIPTS_DIR, "sih_dbf")
@@ -67,9 +69,10 @@ class ProjPaths:
         ProjPaths.SIA_TUNEP_TABLE_PATH = path.join(ProjPaths.TABLES_DIR, "tabela_tunep_sia.csv")
         ProjPaths.SIH_TUNEP_TABLE_PATH = path.join(ProjPaths.TABLES_DIR, "tabela_tunep_sih.csv")
 
+
     @staticmethod
     def create_paths():
-        ProjPaths.create_download_dir()
+        ProjPaths.create_downloads_dir()
         ProjPaths.create_binaries_dir()
         ProjPaths.create_dbfs_dir()
         ProjPaths.create_csvs_dir()
@@ -80,38 +83,48 @@ class ProjPaths:
         ProjPaths.create_blast_dbf()
         ProjPaths.create_latex_dir()
 
+
     @staticmethod
     def empty_dirs():
-        ProjPaths.empty_download_dir()
+        ProjPaths.empty_downloads_dir()
         ProjPaths.empty_dbfs_dir()
         ProjPaths.empty_csvs_dir()
         ProjPaths.empty_results_dir()
         ProjPaths.empty_latex_dir()
+
 
     @staticmethod
     def create_tables_dir():
         if not os.path.exists(ProjPaths.TABLES_DIR):
             os.makedirs(ProjPaths.TABLES_DIR)
 
+
     @staticmethod
     def create_results_dir():
         if not os.path.exists(ProjPaths.RESULTS_DIR):
             os.makedirs(ProjPaths.RESULTS_DIR)
+
 
     @staticmethod
     def create_binaries_dir():
         if not os.path.exists(ProjPaths.BINARIES_DIR):
             os.makedirs(ProjPaths.BINARIES_DIR)
 
+
     @staticmethod
     def create_latex_dir():
         if not os.path.exists(ProjPaths.LATEX_DIR):
             os.makedirs(ProjPaths.LATEX_DIR)
 
+
     @staticmethod
-    def create_download_dir():
-        if not os.path.exists(ProjPaths.DOWNLOAD_DIR):
-            os.makedirs(ProjPaths.DOWNLOAD_DIR)
+    def create_downloads_dir():
+        if not os.path.exists(ProjPaths.SIA_DOWNLOAD_DIR):
+            os.makedirs(ProjPaths.SIA_DOWNLOAD_DIR)
+
+        if not os.path.exists(ProjPaths.SIH_DOWNLOAD_DIR):
+            os.makedirs(ProjPaths.SIH_DOWNLOAD_DIR)
+
 
     @staticmethod
     def create_dbfs_dir():
@@ -187,14 +200,23 @@ class ProjPaths:
 
 
     @staticmethod
-    def empty_download_dir():
-        files = os.listdir(ProjPaths.DOWNLOAD_DIR)
+    def empty_downloads_dir():
+        files = os.listdir(ProjPaths.SIA_DOWNLOAD_DIR)
         for file in files:
             try:
-                os.remove(path.join(ProjPaths.DOWNLOAD_DIR, file))
+                os.remove(path.join(ProjPaths.SIA_DOWNLOAD_DIR, file))
                 continue
             except Exception as e:
-                print(f"could not delete {file} from the download dir:\n {str(e)}")
+                print(f"could not delete {file} from the sia download dir:\n {str(e)}")
+
+        files = os.listdir(ProjPaths.SIH_DOWNLOAD_DIR)
+        for file in files:
+            try:
+                os.remove(path.join(ProjPaths.SIH_DOWNLOAD_DIR, file))
+                continue
+            except Exception as e:
+                print(f"could not delete {file} from the sih download dir:\n {str(e)}")
+        
 
     @staticmethod
     def empty_latex_dir():
@@ -252,6 +274,14 @@ class ProjPaths:
             except Exception as e:
                 print(f"could not delete {file} from the results dir:\n {str(e)}")
 
+
+    @staticmethod
+    def test():
+        print('\nTESTE DOS LOCAIS DO PROGRAMA:')
+        print('binaries dir: ', ProjPaths.BINARIES_DIR)
+        print('blast dbf: ', ProjPaths.BLAST_DBF_PATH)
+        print('download sia dir: ', ProjPaths.SIA_DOWNLOAD_DIR)
+        print('download sih dir: ', ProjPaths.SIH_DOWNLOAD_DIR)
 
 class ProjConfigs:
     N_OF_THREADS = 8
@@ -323,6 +353,22 @@ class ProjParams:
 
     @staticmethod
     def init():
+        if sys.argv[1] == 'test':
+            ProjParams.METHOD = 'TEST'
+            ProjParams.CNES = sys.argv[2]
+            ProjParams.STATE = sys.argv[3]
+            ProjParams.SYSTEM = sys.argv[4]
+            ProjParams.METHOD = sys.argv[5]
+            ProjParams.START = Date.from_string(sys.argv[6])
+            ProjParams.END = Date.from_string(sys.argv[7])
+            ProjParams.END_INTEREST = Date.from_string(sys.argv[8])
+            ProjParams.DATA_CIACAO = Date.from_string(sys.argv[9])
+            ProjParams.CIDADE = sys.argv[10]
+            ProjParams.RAZAO_SOCIAL = sys.argv[11]
+            ProjParams.NOME_FANTASIA = sys.argv[12]
+            ProjParams.NUMERO_PROCESSO = sys.argv[13]
+            return
+        
         if sys.argv[1] == 'raw':
             ProjParams.METHOD = 'RAW'
             ProjParams.CNES = sys.argv[2]
@@ -365,6 +411,22 @@ class ProjParams:
     @staticmethod
     def get_system():
         return ProjParams.SYSTEM
+
+    @staticmethod
+    def test():
+        print('\nTESTE DOS PARÂMETROS DO PROGRAMA:')
+        print('cnes: ', ProjParams.CNES)
+        print('estado: ', ProjParams.STATE)
+        print('inicio: ', ProjParams.START)
+        print('fim: ', ProjParams.END)
+        print('sistema: ', ProjParams.SYSTEM)
+        print('fim correcão', ProjParams.END_INTEREST)
+        print('razão social: ', ProjParams.RAZAO_SOCIAL)
+        print('nome fantasia: ', ProjParams.NOME_FANTASIA)
+        print('numero processo', ProjParams.NUMERO_PROCESSO)
+        print('cidade: ', ProjParams.CIDADE)
+        print('método: ', ProjParams.METHOD)
+        print('data citação', ProjParams.DATA_CIACAO)
 
 
 
@@ -421,16 +483,24 @@ class InterestRate:
                 1.0+rate_after_01_2022,
                 rate_before_01_2022 * (1.0 + rate_after_01_2022))
 
+    @staticmethod
+    def show_selic():
+        print('\nSELIC:')
+        print(InterestRate.SELIC)
 
 
 class Downloads:
     # download a file from the ftp data sus given it's path inside the server
     @staticmethod
     def download_file(file: str):
-        dowload_dir_path = ProjPaths.DOWNLOAD_DIR
+        PREFIX_LOCATION = {
+        'PA': ProjPaths.SIA_DOWNLOAD_DIR,
+        'SP': ProjPaths.SIH_DOWNLOAD_DIR 
+        }
         file_name = path.split(file)[-1]
+        file_prefix = file_name[2]
+        dowload_dir_path = PREFIX_LOCATION[file_prefix]
         local_file_path = path.join(dowload_dir_path, file_name)
-
 
         ftp = FTP("ftp.datasus.gov.br")
         ftp.login()
@@ -458,13 +528,17 @@ class Downloads:
 
     @staticmethod
     def download_many(files: list[str]):
+        PREFIX_LOCATION = {
+        'PA': ProjPaths.SIA_DOWNLOAD_DIR,
+        'SP': ProjPaths.SIH_DOWNLOAD_DIR 
+        }
         ftp = FTP("ftp.datasus.gov.br")
         ftp.login()
-        dowload_dir_path = ProjPaths.DOWNLOAD_DIR
         for file in files:
             file_name = path.split(file)[-1]
+            file_prefix = file_name[:2]
+            dowload_dir_path = PREFIX_LOCATION[file_prefix]
             local_file_path = path.join(dowload_dir_path, file_name)
-
             try:
                 with open(local_file_path, 'wb') as f:
                     ftp.retrbinary(f"RETR {file}", f.write)
@@ -531,8 +605,11 @@ class Downloads:
 class Conversions:
     @staticmethod
     def convert_files():
-        files = os.listdir(ProjPaths.DOWNLOAD_DIR)
-        path_to_files = [path.join(ProjPaths.DOWNLOAD_DIR, file) for file in files]
+        sia_files = os.listdir(ProjPaths.SIA_DOWNLOAD_DIR)
+        sih_files = os.listdir(ProjPaths.SIH_DOWNLOAD_DIR)
+        path_to_files_sia = [path.join(ProjPaths.SIA_DOWNLOAD_DIR, file) for file in sia_files]
+        path_to_files_sih = [path.join(ProjPaths.SIH_DOWNLOAD_DIR, file) for file in sih_files]
+        path_to_files = path_to_files_sia + path_to_files_sih
 
         with Pool(processes=ProjConfigs.N_OF_THREADS) as p:
             p.map(Conversions.convert_file_to_csv, path_to_files)
@@ -598,6 +675,8 @@ class Conversions:
         union = pd.concat(data_frames, ignore_index=True)
 
         union.to_csv(path.join(ProjPaths.UNITED_CSV_DIR, f'{ProjParams.SYSTEM}.csv'), index=False)
+
+        print(system, ' files united')
 
 
 class Tunep:
@@ -682,6 +761,14 @@ class MonthInfo:
 
     def debt_now(self) -> float:
         return ((self.expected - self.got) * self.rates[2])
+
+    def __str__(self):
+        return f'''\nwhen: {self.when}
+        got: {self.got}
+        expected: {self.expected}
+        debt then: {self.debt_then()}
+        rate: {self.rates[2]}
+        '''
 
 class YearInfo:
     def __init__(self, year: int):
@@ -802,10 +889,16 @@ class Processing:
 
     @staticmethod
     def months(sia_files: list[str], sih_files: list[str], method: str) -> list[MonthInfo]:
+
+        if (method == 'TUNEP' or method == 'BOTH'):
+            print(f'method {method} not implemented yet')
+            exit(1)
+
         FUNCTION_TABLE = {
             'IVR': [Processing.month_SIA_IVR, Processing.month_SIH_IVR],
             'TUNEP': [Processing.month_SIA_TUNEP, Processing.month_SIH_TUNEP],
-            'BOTH': [Processing.month_SIA_IVR_TUNEP, Processing.month_SIH_IVR_TUNEP]
+            'BOTH': [Processing.month_SIA_IVR_TUNEP, Processing.month_SIH_IVR_TUNEP],
+            'RAW': [Processing.month_SIA_IVR, Processing.month_SIH_IVR]
         }
 
         sia_func, sih_func = FUNCTION_TABLE[method]
@@ -900,6 +993,7 @@ class LatexBuilder:
             'IVR': ivr_file_template,
             'TUNEP': tunep_file_template,
             'BOTH': tunep_file_template,
+            'RAW': tunep_file_template,
         }
 
         template = METHOD_TEMPLATE[method]
@@ -976,40 +1070,17 @@ def get_files(system: str):
         ProjParams.get_start_date(),
         ProjParams.get_end_date())
 
-    print("will download the follwing files:")
+    print("\nwill download the follwing files:")
     for file in files:
         print(file)
 
     Downloads.download(files)
     print("downloads finished")
 
-    Conversions.convert_files()
-    print("conversions finished")
-
-    Conversions.unite_files(system)
-    print("files united")
 
 
-def main():
-    ProjPaths.init()
-    ProjParams.init()
-    InterestRate.load_selic()
-    Tunep.load_tunep()
-
-    # download e conversão para csv
-    if ProjParams.SYSTEM == "SIA" or ProjParams.SYSTEM == "SIH":
-        get_files(ProjParams.SYSTEM)
-    elif ProjParams.SYSTEM == "BOTH":
-        get_files("SIA")
-        ProjPaths.empty_download_dir()
-        get_files("SIH")
-    else:
-        print(f'Sistema do sus não reconhecido {ProjParams.SYSTEM}')
-        exit(1)
-
-    if ProjParams.METHOD == 'RAW':
-        return
-
+# nesse modo de execução do programa, é gerado um laudo com qualquer dado que já esteja presente no programa.
+def test_mode():
     # arquivos a serem processados
     sih_files = [path.join(ProjPaths.SIH_CSVS_DIR, file) for file in os.listdir(ProjPaths.SIH_CSVS_DIR)]
     sia_files = [path.join(ProjPaths.SIA_CSVS_DIR, file) for file in os.listdir(ProjPaths.SIA_CSVS_DIR)]
@@ -1022,3 +1093,38 @@ def main():
     # geração dos documentos pertinentes aos dados
     LatexBuilder.build_latex_file(months, years, total, ProjParams.METHOD)    
     PdfBuilder.write_pdf(path.join(ProjPaths.RESULTS_DIR, 'laudo.pdf'))
+
+
+
+def main():
+    ProjPaths.init()
+    ProjPaths.test()
+    ProjParams.init()
+    ProjParams.test()
+    InterestRate.load_selic()
+    InterestRate.show_selic()
+    Tunep.load_tunep() 
+
+    if (ProjParams.SYSTEM == 'SIA' or ProjParams.SYSTEM == 'BOTH'):
+        get_files('SIA')
+    if (ProjParams.SYSTEM == 'SIH' or ProjParams.SYSTEM == 'BOTH'):
+        get_files('SIH')
+
+    Conversions.convert_files()
+
+    if (ProjParams.SYSTEM == 'SIA' or ProjParams.SYSTEM == 'BOTH'):
+        Conversions.unite_files('SIA')
+    if (ProjParams.SYSTEM == 'SIH' or ProjParams.SYSTEM == 'BOTH'):
+        Conversions.unite_files('SIH')
+
+    sih_files = [path.join(ProjPaths.SIH_CSVS_DIR, file) for file in os.listdir(ProjPaths.SIH_CSVS_DIR)]
+    sia_files = [path.join(ProjPaths.SIA_CSVS_DIR, file) for file in os.listdir(ProjPaths.SIA_CSVS_DIR)]
+
+    months = Processing.months(sia_files, sih_files, ProjParams.METHOD)
+    years = Processing.year_results(months)
+    total = Processing.total_result(months)
+
+    LatexBuilder.build_latex_file(months, years, total, ProjParams.METHOD)    
+    PdfBuilder.write_pdf(path.join(ProjPaths.RESULTS_DIR, 'laudo.pdf'))
+
+main()
