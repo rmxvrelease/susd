@@ -674,7 +674,7 @@ class Conversions:
 
         union = pd.concat(data_frames, ignore_index=True)
 
-        union.to_csv(path.join(ProjPaths.UNITED_CSV_DIR, f'{ProjParams.SYSTEM}.csv'), index=False)
+        union.to_csv(path.join(ProjPaths.UNITED_CSV_DIR, f'{system}.csv'), index=False)
 
         print(system, ' files united')
 
