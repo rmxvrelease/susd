@@ -498,7 +498,7 @@ class Downloads:
         'SP': ProjPaths.SIH_DOWNLOAD_DIR 
         }
         file_name = path.split(file)[-1]
-        file_prefix = file_name[2]
+        file_prefix = file_name[:2]
         dowload_dir_path = PREFIX_LOCATION[file_prefix]
         local_file_path = path.join(dowload_dir_path, file_name)
 
