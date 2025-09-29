@@ -462,12 +462,12 @@ class InterestRate:
     @staticmethod
     def rate_until_01_2022(s: Date) -> float:
         '''Calcula o juros da data "s" até a 01-2022'''
-        s_month_until_01_2021 = (s.year - 2022)*12 + s.month - 1
+        s_month_until_01_2022 = (s.year - 2022)*12 + s.month - 1
 
-        if (s_month_until_01_2021 >= 0):
+        if (s_month_until_01_2022 >= 0):
             return(1.0)
 
-        return INTEREST_BEFORE_01_2022[s_month_until_01_2021]
+        return INTEREST_BEFORE_01_2022[s_month_until_01_2022]
 
     @staticmethod
     def complete_rate(s: Date, e: Date) -> float:
